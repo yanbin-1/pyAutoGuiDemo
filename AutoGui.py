@@ -6,6 +6,16 @@ import os
 import datetime
 
 
+class GetRunNum:
+    # 全局计数器
+    __run_num = 1
+
+    @classmethod
+    def addRunNum(cls):
+        cls.__run_num += 1
+        return cls.__run_num
+
+
 def myLog(*BUF, log_method=1):
     # 输出到文件
     if log_method == 1:
@@ -90,6 +100,7 @@ def executeCommand(img_path: str, command_dict: dict, interval: float) -> None:
     """
     根据给的那个参数执行相应逻辑命令
     定位图片中心、移动、偏移、左键、右键、中键、输入、按住、松开、检测（暂定给定图片检测出现和消失的瞬间）、打开软件、关闭软件、等待、区间内循环
+    当输入为"$inputNum"，则替换为全局计数器
     Args:
         img_path: 图片路径
         command_dict: 命令参数{命令：参数}
@@ -154,6 +165,11 @@ def executeCommand(img_path: str, command_dict: dict, interval: float) -> None:
             pyautogui.moveRel(offset_x, offset_y)
 
         elif command_key == "输入":
+            # 如果需要输入全局计数器
+            if "$inputNum" in command_value:
+                input_num = str(GetRunNum.addRunNum())
+                command_value = command_value.replace("$inputNum", input_num)
+
             # 原本剪切板的内容
             text_backup = pyperclip.paste()
 
@@ -214,9 +230,6 @@ def executeCommand(img_path: str, command_dict: dict, interval: float) -> None:
 
 
 def main() -> None:
-    # TODO
-    # 2、整个excel不断执行
-
     """
     主程序运行
     Returns:
