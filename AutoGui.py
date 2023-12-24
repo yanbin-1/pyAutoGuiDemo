@@ -13,6 +13,13 @@ class GetRunNum:
     @classmethod
     def addRunNum(cls):
         cls.__run_num += 1
+
+    @classmethod
+    def subNum(cls):
+        cls.__run_num -= 1
+
+    @classmethod
+    def getRunNum(cls):
         return cls.__run_num
 
 
@@ -27,7 +34,7 @@ def myLog(*BUF, log_method=1):
 
     # 输出到控制台
     elif log_method == 2:
-        print(datetime.datetime.now().strftime("%F %T"), end="\t");
+        print(datetime.datetime.now().strftime("%F %T"), end="\t")
         for i in BUF:
             print(i, end=" ")
         print(end="\n")
@@ -96,11 +103,24 @@ def detectImage(img_path, command_value):
         time.sleep(0.1)
 
 
+def detectFile(command_value, method=1):
+    # 检测文件出现
+    if method == 1:
+        while not os.path.exists(command_value):
+            time.sleep(0.1)
+
+    # 检测文件消失
+    if method == 2:
+        while os.path.exists(command_value):
+            time.sleep(0.1)
+
+
 def executeCommand(img_path: str, command_dict: dict, interval: float) -> None:
     """
     根据给的那个参数执行相应逻辑命令
-    定位图片中心、移动、偏移、左键、右键、中键、输入、按住、松开、检测（暂定给定图片检测出现和消失的瞬间）、打开软件、关闭软件、等待、区间内循环
-    当输入为"$inputNum"，则替换为全局计数器
+    定位图片中心、移动、偏移、左键、右键、中键、输入、按住、松开、检测（暂定给定图片检测出现和消失的瞬间）、
+    打开软件、关闭软件、等待、区间内循环、检测文件是否出现，检测文件是否消失
+    当输入为"$inputNum"，则替换为全局计数器并加1，如果输入"$getNum"，则输入全局计数器
     Args:
         img_path: 图片路径
         command_dict: 命令参数{命令：参数}
@@ -114,6 +134,17 @@ def executeCommand(img_path: str, command_dict: dict, interval: float) -> None:
     move_flag = True
 
     for command_key, command_value in command_dict.items():
+        # 如果输入全局计数器
+        if "$addNum" == command_value:
+            GetRunNum.addRunNum()
+
+        if "$subNum" == command_value:
+            GetRunNum.subNum()
+
+        if "$getNum" in command_value:
+            input_num = str(GetRunNum.getRunNum())
+            command_value = command_value.replace("$getNum", input_num)
+
         # show
         myLog("图片：{}，命令：{} {}".format(img_path, command_key, command_value))
 
@@ -164,12 +195,13 @@ def executeCommand(img_path: str, command_dict: dict, interval: float) -> None:
             # 偏移
             pyautogui.moveRel(offset_x, offset_y)
 
-        elif command_key == "输入":
-            # 如果需要输入全局计数器
-            if "$inputNum" in command_value:
-                input_num = str(GetRunNum.addRunNum())
-                command_value = command_value.replace("$inputNum", input_num)
+        elif command_key == "检测文件出现":
+            detectFile(command_value)
 
+        elif command_key == "检测文件消失":
+            detectFile(command_value, 2)
+
+        elif command_key == "输入":
             # 原本剪切板的内容
             text_backup = pyperclip.paste()
 
@@ -210,20 +242,20 @@ def executeCommand(img_path: str, command_dict: dict, interval: float) -> None:
             split_text = command_value.split("\\")
             root = "\\".join(split_text[:-1])
             name = split_text[-1]
-            os.system("cd {} & {}".format(root, name))
+            os.system("cd {} & start {}".format(root, name))
 
         # 关闭软件
         elif command_key == "关闭软件":
-            os.system("tasklist & taskkill /f /t /im {}".format(command_value))
+            os.system("taskkill /f /t /im {}".format(command_value))
 
         # 等待
         elif command_key == "等待":
             try:
-                command_value = int(command_value)
+                command_value = float(command_value)
             except:
-                pyautogui.alert(text="等待时间请输入整数", title="错误")
+                pyautogui.alert(text="等待时间请输入数字", title="错误")
 
-            time.sleep(int(command_value))
+            time.sleep(float(command_value))
 
         # 等待
         time.sleep(interval)
@@ -297,6 +329,10 @@ def main() -> None:
                 timeout_method = df.iloc[i, 4]  # 超时行为
                 interval = 0.1 if pd.isna(df.iloc[i, 5]) else df.iloc[i, 5]  # 动作间隔
                 source_command = df.iloc[i, 6]  # 执行动作
+
+                # 允许空行
+                if pd.isna(source_command) or len(source_command) == 0:
+                    continue
 
                 # 检查并解析command格式
                 command_dict = checkParseCommand(source_command)
