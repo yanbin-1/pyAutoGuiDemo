@@ -119,7 +119,7 @@ def executeCommand(img_path: str, command_dict: dict, interval: float) -> None:
     """
     根据给的那个参数执行相应逻辑命令
     定位图片中心、移动、偏移、左键、右键、中键、输入、按住、松开、检测（暂定给定图片检测出现和消失的瞬间）、
-    打开软件、关闭软件、等待、区间内循环、检测文件是否出现，检测文件是否消失
+    打开软件、关闭软件、等待、区间内循环、检测文件是否出现，检测文件是否消失、新建文件夹
     当输入为"$inputNum"，则替换为全局计数器并加1，如果输入"$getNum"，则输入全局计数器
     Args:
         img_path: 图片路径
@@ -256,6 +256,27 @@ def executeCommand(img_path: str, command_dict: dict, interval: float) -> None:
                 pyautogui.alert(text="等待时间请输入数字", title="错误")
 
             time.sleep(float(command_value))
+
+        # 如果输入新建文件夹
+        # 新建文件夹 = C:\yan\1-400
+        elif command_key == "新建文件夹":
+            root, names = command_value.split("\\")
+            split_text = names.split("-")
+            if len(split_text) != 2:
+                pyautogui.alert(text="未指定起始终止文件夹", title="错误")
+
+            try:
+                start_name = int(split_text[0])
+                end_name = int(split_text[1])
+
+            except:
+                pyautogui.alert(text="起始终止文件夹名称必须为整数", title="错误")
+
+            if end_name < start_name:
+                pyautogui.alert(text="终止文件夹不能小于起始文件夹吧", title="错误")
+
+            # 创建文件夹
+            [os.mkdir(os.path.join(root, str(name))) for name in range(start_name, end_name + 1)]
 
         # 等待
         time.sleep(interval)
