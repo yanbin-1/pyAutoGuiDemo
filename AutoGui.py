@@ -5,6 +5,42 @@ import pyperclip
 import os
 import datetime
 
+from typing import Union
+
+
+def replaceRunNum(string: str, sub_string: str) -> str:
+    # 方法字典
+    run_num_dict = {
+        "$addNum": GetRunNum.addRunNum,
+        "$subNum": GetRunNum.subRunNum
+    }
+
+    value_ = ""
+    left, right = 0, len(sub_string)
+    while right < len(string) + 1:
+        if string[left: right] == sub_string:
+            # 执行相应全局计时器操作
+            run_num_dict[sub_string]()
+
+            # 替换
+            value_ += str(GetRunNum.getRunNum())
+
+            # 左右指针向前移动
+            left = right
+            right += right
+        else:
+            # 原封不动添加
+            value_ += string[left]
+
+            # 左右指针向前移动
+            left += 1
+            right += 1
+
+    # 添加剩余字符串
+    value_ += string[left:]
+
+    return value_
+
 
 class GetRunNum:
     # 全局计数器
@@ -15,7 +51,7 @@ class GetRunNum:
         cls.__run_num += 1
 
     @classmethod
-    def subNum(cls):
+    def subRunNum(cls):
         cls.__run_num -= 1
 
     @classmethod
@@ -104,15 +140,34 @@ def detectImage(img_path, command_value):
 
 
 def detectFile(command_value, method=1):
-    # 检测文件出现
-    if method == 1:
-        while not os.path.exists(command_value):
-            time.sleep(0.1)
+    """
+    检测文件出现或消失
+    Args:
+        command_value: 文件路径
+            单个文件——C:\Yan\test.txt
+            多个文件——C:\Yan\test.txt && C:\Yan\test1.txt && C:\Yan\test2.txt
+        method: method=1检测出现，method=2检测消失
 
-    # 检测文件消失
-    if method == 2:
-        while os.path.exists(command_value):
-            time.sleep(0.1)
+    Returns:
+
+    """
+    # 根据command_value进行单个文件和多个文件检测
+    command_value_split = command_value.split("&&")
+
+    for command_value in command_value_split:
+
+        # 去除首尾空格
+        command_value = command_value.strip()
+
+        # 检测文件出现
+        if method == 1:
+            while not os.path.exists(command_value):
+                time.sleep(0.1)
+
+        # 检测文件消失
+        elif method == 2:
+            while os.path.exists(command_value):
+                time.sleep(0.1)
 
 
 def executeCommand(img_path: str, command_dict: dict, interval: float) -> None:
@@ -120,7 +175,12 @@ def executeCommand(img_path: str, command_dict: dict, interval: float) -> None:
     根据给的那个参数执行相应逻辑命令
     定位图片中心、移动、偏移、左键、右键、中键、输入、按住、松开、检测（暂定给定图片检测出现和消失的瞬间）、
     打开软件、关闭软件、等待、区间内循环、检测文件是否出现，检测文件是否消失、新建文件夹
+
     当输入为"$inputNum"，则替换为全局计数器并加1，如果输入"$getNum"，则输入全局计数器
+    当"$addNum"和"$subNum"内嵌在语句中，则直接将其替换为相应的全局计数器，如"$getNum123$addNumfbaxx$subNumxx" -> "11232fbaxx1xx"
+
+    检测单个文件——C:\Yan\test.txt
+    检测多个文件——C:\Yan\test.txt && C:\Yan\test1.txt && C:\Yan\test2.txt
     Args:
         img_path: 图片路径
         command_dict: 命令参数{命令：参数}
@@ -134,16 +194,21 @@ def executeCommand(img_path: str, command_dict: dict, interval: float) -> None:
     move_flag = True
 
     for command_key, command_value in command_dict.items():
-        # 如果输入全局计数器
-        if "$addNum" == command_value:
-            GetRunNum.addRunNum()
-
-        if "$subNum" == command_value:
-            GetRunNum.subNum()
-
         if "$getNum" in command_value:
             input_num = str(GetRunNum.getRunNum())
             command_value = command_value.replace("$getNum", input_num)
+
+        # 如果输入全局计数器
+        if "$addNum" == command_value:
+            GetRunNum.addRunNum()
+        # 全局计数器内嵌在语句中，将$addNum替换为相应的数
+        elif "$addNum" in command_value:
+            command_value = replaceRunNum(command_value, "$addNum")
+
+        if "$subNum" == command_value:
+            GetRunNum.subRunNum()
+        elif "$subNum" in command_value:
+            command_value = replaceRunNum(command_value, "$subNum")
 
         # show
         myLog("图片：{}，命令：{} {}".format(img_path, command_key, command_value))
@@ -268,12 +333,11 @@ def executeCommand(img_path: str, command_dict: dict, interval: float) -> None:
             try:
                 start_name = int(split_text[0])
                 end_name = int(split_text[1])
+                if end_name < start_name:
+                    pyautogui.alert(text="终止文件夹不能小于起始文件夹吧", title="错误")
 
             except:
                 pyautogui.alert(text="起始终止文件夹名称必须为整数", title="错误")
-
-            if end_name < start_name:
-                pyautogui.alert(text="终止文件夹不能小于起始文件夹吧", title="错误")
 
             # 创建文件夹
             [os.mkdir(os.path.join(root, str(name))) for name in range(start_name, end_name + 1)]
@@ -282,48 +346,12 @@ def executeCommand(img_path: str, command_dict: dict, interval: float) -> None:
         time.sleep(interval)
 
 
-def main() -> None:
+def runGui(path, part_cycle_start, part_cycle_end, part_cycle_time, all_cycle_times) -> Union[None, str]:
     """
     主程序运行
     Returns:
 
     """
-    # 指定excel路径
-    path = input("请输入命令文件路径")
-    if len(path) == 0:
-        path = "./example.xlsx"
-
-    # 手动输入参数
-    part_cycle_start = -1
-    part_cycle_end = -1
-    part_cycle_time = -1
-
-    while True:
-        cycle_cmd = input("是否指定循环区间和循环次数/(Y/N)")
-        if cycle_cmd not in ["Y", "y", "N", "n"]:
-            myLog("输入错误，请重新输入")
-            continue
-
-        # 不需要循环
-        if cycle_cmd in ["N", "n"]:
-            break
-
-        # 开始输入循环相关
-        try:
-            part_cycle_start = int(input("请根据所给excel所在行输入循环开始区间"))  # 从2开始
-            part_cycle_end = int(input("请根据所给excel所在行输入循环结束区间"))
-            part_cycle_time = int(input("请输入上述循环区间的循环次数"))
-
-            if part_cycle_end <= part_cycle_start:
-                myLog("结束区间需要大于开始区间")
-                continue
-
-            break
-        except:
-            myLog("请输入整数")
-
-    # 指定整个excel的循环执行次数
-    all_cycle_times = int(input("请输入整个excel的循环执行次数"))
 
     for cycle_time in range(1, all_cycle_times + 1):
 
@@ -376,8 +404,14 @@ def main() -> None:
                 i += 1
         except Exception as e:
             myLog("第{}次循环出错：{}".format(cycle_time, str(e.args[0])))
+            return "第{}次循环出错：{}".format(cycle_time, str(e.args[0]))
 
 
 if __name__ == '__main__':
-    main()
-    os.system("pause")
+    # path = r"E:\Code\temp"
+    # names = os.listdir(path)
+    # detectFile(" && ".join([os.path.join(path, name) for name in names]) + " && E:\\Code\\temp\\test5.txt")
+
+    string = "$getNum123$addNumfbaxx$subNumxx"
+    data = {"1": string}
+    executeCommand("", data, 0.1)
